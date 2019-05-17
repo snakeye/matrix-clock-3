@@ -235,6 +235,8 @@ public:
           }
 
           registers[matrix] = MAX7219_REG_DIGIT0 + col;
+
+          value = (value >> 1) | ((value & 1) << 7);
           values[matrix] = value;
         }
       }

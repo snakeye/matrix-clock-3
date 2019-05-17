@@ -87,14 +87,20 @@ void setup()
   Rtc.SetSquareWavePin(DS3231SquareWavePin_ModeClock);
   Rtc.SetSquareWavePinClockFrequency(DS3231SquareWaveClock_1kHz);
 
-  //
-  //pinMode(pinInterrupt, INPUT_PULLUP);
-  //attachInterrupt(digitalPinToInterrupt(pinInterrupt), onSquareWave, FALLING);
+  // //
+  // pinMode(pinInterrupt, INPUT_PULLUP);
+  // attachInterrupt(digitalPinToInterrupt(pinInterrupt), onSquareWave, FALLING);
 }
 
 void loop()
 {
-  RecurringTask::interval(50, []() {
+  bool dots = false;
+
+  RecurringTask::interval(500, [&]() {
+    dots = !dots;
+  });
+
+  RecurringTask::interval(50, [=]() {
     // Clear display
     display.clear();
 
@@ -128,24 +134,42 @@ void loop()
 
     int h = hour(local);
     int m = minute(local);
-    bool dots = rtcSquareCouter < 512;
+    int s = second(local);
+    // bool dots = rtcSquareCouter < 512;
+
+    int x = 0;
 
     // draw time
     if (h >= 10)
     {
-      display.drawChar(7, 0, digit(h / 10));
+      display.drawChar(x, 0, digit(h / 10));
     }
-    display.drawChar(13, 0, digit(h % 10));
+    x += 6;
+
+    display.drawChar(x, 0, digit(h % 10));
+    x += 6;
 
     // draw dots
     if (dots)
     {
-      display.drawChar(19, 0, ':');
+      display.drawChar(x, 0, ':');
     }
+    x += 4;
 
     //
-    display.drawChar(23, 0, digit(m / 10));
-    display.drawChar(39, 0, digit(m % 10));
+    display.drawChar(x, 0, digit(m / 10));
+    x += 6;
+    display.drawChar(x, 0, digit(m % 10));
+    x += 6;
+
+    x += 4;
+
+    //
+    display.drawChar(x, 0, digit(s / 10));
+    x += 6;
+    display.drawChar(x, 0, digit(s % 10));
+    x += 6;
+
     // }
 
     //

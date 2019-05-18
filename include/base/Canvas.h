@@ -137,7 +137,7 @@ public:
     return char_width;
   }
 
-  void drawText(int x, int y, char *str)
+  void drawText(int x, int y, const char *str)
   {
     // if is not visible, return
     if (y < -8 || y > 8)

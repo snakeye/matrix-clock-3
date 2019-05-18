@@ -19,6 +19,10 @@
 #include <DNSServer.h>
 
 //
+#include <ESP8266mDNS.h>
+#include <ArduinoOTA.h>
+
+//
 #include <RecurringTask.h>
 #include <WiFiConfig.h>
 
@@ -54,7 +58,7 @@ TimeChangeRule CET = {"CET", Last, Sun, Oct, 2, 60 * 1};
 Timezone tzBerlin(CEST, CET);
 
 // NTP
-const char *ntpServer = "pool.ntp.org";
+const char *ntpServer = "europe.pool.ntp.org";
 const int ntpIntervalShort = 60;         // short interval while RTC clock are incorrect
 const int ntpIntervalLong = 60 * 60 * 6; // long interval while RTC clock are correct
 
@@ -69,9 +73,12 @@ volatile int rtcSquareCouter = 0;
 int intensity = 0;
 int targetIntensity = 0;
 
+bool dots = false;
+
 /**
-   RTC Square wave interrupt - 1024Hz
-*/
+ * @brief RTC Square wave interrupt - 1024Hz
+ *
+ */
 void onSquareWave()
 {
   rtcSquareCouter = (rtcSquareCouter + 1) % 1024;
@@ -91,8 +98,6 @@ char digit(int val)
 void setup()
 {
   Serial.begin(115200);
-
-  targetIntensity = (analogRead(A0) * 15) / 1024;
 
   display.init();
   display.setIntensity(0);
@@ -115,16 +120,16 @@ void setup()
   // //
   // pinMode(pinInterrupt, INPUT_PULLUP);
   // attachInterrupt(digitalPinToInterrupt(pinInterrupt), onSquareWave, FALLING);
-}
 
-bool dots = false;
+  //
+  ArduinoOTA.begin();
+}
 
 void drawTime(int x, int y, time_t local, bool dots)
 {
   int h = hour(local);
   int m = minute(local);
   int s = second(local);
-  // bool dots = rtcSquareCouter < 512;
 
   // draw time
   if (h >= 10)
@@ -141,7 +146,7 @@ void drawTime(int x, int y, time_t local, bool dots)
   {
     display.drawChar(x, y, ':');
   }
-  x += 4;
+  x += 3;
 
   //
   display.drawChar(x, y, digit(m / 10));
@@ -163,11 +168,15 @@ void loop()
   timeClient.update();
 
   //
-  RecurringTask::interval(500, [&]() {
+  ArduinoOTA.handle();
+
+  //
+  RecurringTask::interval(500, []() {
     dots = !dots;
   });
 
-  RecurringTask::interval(50, [=]() {
+  // display update
+  RecurringTask::interval(50, []() {
     // Clear display
     display.clear();
 
@@ -184,6 +193,8 @@ void loop()
       {
         // connected but time is incorrect
         display.drawText(7, 0, "--:--");
+        display.commit();
+
         Serial.println("RTC lost confidence in the DateTime!");
 
         if (timeClient.forceUpdate())
@@ -215,7 +226,7 @@ void loop()
   });
 
   // change brightness
-  RecurringTask::interval(100, []() {
+  RecurringTask::interval(500, []() {
     targetIntensity = (analogRead(A0) * 15) / 1024;
 
     // change display intensity
@@ -230,4 +241,6 @@ void loop()
       display.setIntensity(intensity);
     }
   });
+
+  delay(1);
 }

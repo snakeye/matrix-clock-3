@@ -40,7 +40,7 @@ typedef MatrixArray<TMatrix, 5, 1> TMatrixArray;
 typedef Canvas<TMatrixArray> TCanvas;
 
 // display definition
-typedef DisplayColumnCathode<TCanvas, 2> TDisplay;
+typedef DisplayColumnCathode<TCanvas, 15> TDisplay;
 
 TDisplay display;
 

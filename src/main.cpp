@@ -28,6 +28,7 @@
 
 #include "LedMatrixDisplay.h"
 
+//
 using namespace LedMatrixDisplay;
 
 // matrix type definition
@@ -52,6 +53,9 @@ struct Config
 
 } config;
 
+//
+const char *deviceName = "Matrix Clock v3";
+
 // Time zone
 TimeChangeRule CEST = {"CEST", Last, Sun, Mar, 2, 60 * 2};
 TimeChangeRule CET = {"CET", Last, Sun, Oct, 2, 60 * 1};
@@ -74,6 +78,7 @@ int intensity = 0;
 int targetIntensity = 0;
 
 bool dots = false;
+bool ota = false;
 
 /**
  * @brief RTC Square wave interrupt - 1024Hz
@@ -98,15 +103,19 @@ char digit(int val)
 void setup()
 {
   Serial.begin(115200);
+  delay(10);
+  Serial.println('\n');
 
+  //
   display.init();
-  display.setIntensity(0);
+  display.setIntensity(2);
   display.clear();
-  display.drawText(7, 0, (char *)"  :  ");
+  const int textWidth = display.getTextWidth((const char *)"Hello!");
+  display.drawText((display.width - textWidth) / 2, 0, (char *)"Hello!");
   display.commit();
 
   //
-  configManager.setAPName("Matrix Clock v3");
+  configManager.setAPName(deviceName);
   configManager.begin(config);
 
   //
@@ -122,37 +131,61 @@ void setup()
   // attachInterrupt(digitalPinToInterrupt(pinInterrupt), onSquareWave, FALLING);
 
   //
+  MDNS.begin("matrix-clock-3");
+
+  // Over-the-Air update
+  ArduinoOTA.onStart([]() {
+    display.clear();
+    display.drawChar(1, 0, '*');
+    display.commit();
+  });
+
+  ArduinoOTA.onEnd([]() {
+    display.clear();
+    display.drawText(1, 0, "*...");
+    display.commit();
+  });
+
   ArduinoOTA.begin();
 }
 
-void drawTime(int x, int y, time_t local, bool dots)
+/**
+ * @brief
+ *
+ * @param x
+ * @param y
+ * @param local
+ * @param dots
+ */
+void drawTime(const int x, const int y, const time_t local, bool dots)
 {
   int h = hour(local);
   int m = minute(local);
   int s = second(local);
+  int i = x;
 
   // draw time
   if (h >= 10)
   {
-    display.drawChar(x, y, digit(h / 10));
+    display.drawChar(i, y, digit(h / 10));
   }
-  x += 6;
+  i += 6;
 
-  display.drawChar(x, y, digit(h % 10));
-  x += 6;
+  display.drawChar(i, y, digit(h % 10));
+  i += 6;
 
   // draw dots
   if (dots)
   {
-    display.drawChar(x, y, ':');
+    display.drawChar(i, y, ':');
   }
-  x += 3;
+  i += 3;
 
   //
-  display.drawChar(x, y, digit(m / 10));
-  x += 6;
-  display.drawChar(x, y, digit(m % 10));
-  x += 6;
+  display.drawChar(i, y, digit(m / 10));
+  i += 6;
+  display.drawChar(i, y, digit(m % 10));
+  i += 6;
 }
 
 /**
@@ -183,20 +216,24 @@ void loop()
     //
     if (!Rtc.IsDateTimeValid())
     {
+      Serial.println("RTC lost confidence in the DateTime!");
+
+      if (dots)
+      {
+        display.drawText(7, 0, "--:--");
+      }
+      else
+      {
+        display.drawText(7, 0, "  :  ");
+      }
+
       if (WiFi.status() != WL_CONNECTED)
       {
         // not connected
-        display.drawText(7, 0, "  :  ");
         Serial.println("Connecting to WiFi...");
       }
       else
       {
-        // connected but time is incorrect
-        display.drawText(7, 0, "--:--");
-        display.commit();
-
-        Serial.println("RTC lost confidence in the DateTime!");
-
         if (timeClient.forceUpdate())
         {
           time_t now = timeClient.getEpochTime();

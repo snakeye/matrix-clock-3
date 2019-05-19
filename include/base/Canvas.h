@@ -54,7 +54,7 @@ public:
    * @param x
    * @param y
    */
-  void setPixel(int x, int y)
+  void setPixel(const int x, const int y)
   {
     unsigned int row = y / TMatrixArray::matrixHeight;
     unsigned int bit = y % TMatrixArray::matrixHeight;
@@ -68,7 +68,7 @@ public:
    * @param x
    * @param y
    */
-  void clearPixel(int x, int y)
+  void clearPixel(const int x, const int y)
   {
     unsigned int row = y / TMatrixArray::matrixHeight;
     unsigned int bit = y % TMatrixArray::matrixHeight;
@@ -84,12 +84,34 @@ public:
    * @return true
    * @return false
    */
-  bool getPixel(int x, int y)
+  bool getPixel(const int x, const int y)
   {
     unsigned int row = y / TMatrixArray::matrixHeight;
     unsigned int bit = y % TMatrixArray::matrixHeight;
 
     return (frameBuffer[TMatrixArray::width * row + x] & (1 << bit)) != 0;
+  }
+
+  /**
+   * @brief Get the Text Width object
+   *
+   * @param str
+   * @return unsigned int
+   */
+  unsigned int getTextWidth(const char *str) const
+  {
+    unsigned int width = 0;
+
+    for (char *p = (char *)str; *p != '\0'; p++)
+    {
+      const unsigned int charWidth = charset_width[*p];
+      if (charWidth > 0)
+      {
+        width += charWidth + 1;
+      }
+    }
+
+    return width;
   }
 
   /**
@@ -100,7 +122,7 @@ public:
    * @param ch
    * @return unsigned int
    */
-  unsigned int drawChar(int x, int y, unsigned char ch)
+  unsigned int drawChar(const int x, const int y, const unsigned char ch)
   {
     // we draw only first half of ASCII charset
     if (ch > 127)
@@ -137,7 +159,14 @@ public:
     return char_width;
   }
 
-  void drawText(int x, int y, const char *str)
+  /**
+   * @brief
+   *
+   * @param x
+   * @param y
+   * @param str
+   */
+  void drawText(const int x, const int y, const char *str)
   {
     // if is not visible, return
     if (y < -8 || y > 8)

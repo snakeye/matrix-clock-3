@@ -54,6 +54,7 @@ eagle.epf
 .directory
 
 # Platformio
+.pio
 .pioenvs
 .piolibdeps
 

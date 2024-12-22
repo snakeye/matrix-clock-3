@@ -15,7 +15,6 @@
 #include <RtcDS3231.h>
 
 //
-#include <WiFiConfig.h>
 #include <DNSServer.h>
 
 //
@@ -24,9 +23,10 @@
 
 //
 #include <RecurringTask.h>
-#include <WiFiConfig.h>
 
 #include "LedMatrixDisplay.h"
+
+#include "config.h"
 
 //
 using namespace LedMatrixDisplay;
@@ -45,49 +45,27 @@ typedef DisplayColumnCathode<TCanvas, 15> TDisplay;
 
 TDisplay display;
 
-//
-ConfigManager configManager;
+// NTP
+WiFiUDP ntpUDP;
+const char *ntpServer = "pool.ntp.org";
+NTPClient timeClient(ntpUDP, ntpServer);
+const unsigned long ntpUpdateInterval = 86400;
 
-struct Config
-{
-
-} config;
-
-//
-const char *deviceName = "Matrix Clock v3";
+// RTC clock DS3231
+// RTC keeps time in UTC!
+RtcDS3231<TwoWire> Rtc(Wire);
 
 // Time zone
 TimeChangeRule CEST = {"CEST", Last, Sun, Mar, 2, 60 * 2};
 TimeChangeRule CET = {"CET", Last, Sun, Oct, 2, 60 * 1};
 Timezone tzBerlin(CEST, CET);
 
-// NTP
-const char *ntpServer = "europe.pool.ntp.org";
-const int ntpIntervalShort = 60;         // short interval while RTC clock are incorrect
-const int ntpIntervalLong = 60 * 60 * 6; // long interval while RTC clock are correct
-
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, ntpServer, ntpIntervalShort, ntpIntervalLong);
-
-// RTC clock DS3231
-RtcDS3231<TwoWire> Rtc(Wire);
-const unsigned char pinInterrupt = 16;
-volatile int rtcSquareCouter = 0;
-
-int intensity = 0;
-int targetIntensity = 0;
-
+//
 bool dots = false;
-bool ota = false;
 
-/**
- * @brief RTC Square wave interrupt - 1024Hz
- *
- */
-void onSquareWave()
-{
-  rtcSquareCouter = (rtcSquareCouter + 1) % 1024;
-}
+//
+static int intensity = 2;
+static int targetIntensity = 2;
 
 /**
  * @brief
@@ -95,189 +73,263 @@ void onSquareWave()
  * @param val
  * @return char
  */
-char digit(int val)
+inline char digit(int val)
 {
   return '0' + val;
+}
+
+/**
+ * @param str
+ */
+void printTextCentered(const char *str)
+{
+  const int textWidth = display.getTextWidth(str);
+  const int textOffset = ((int)display.width - textWidth) / 2;
+  display.drawText(textOffset, 0, str);
+}
+
+/**
+ *
+ */
+void onOTAStart()
+{
+  display.setIntensity(2);
+  display.clear();
+  printTextCentered("*...");
+  display.commit();
+}
+
+/**
+ *
+ */
+void onOTAEnd()
+{
+  display.clear();
+  printTextCentered("Done");
+  display.commit();
 }
 
 void setup()
 {
   Serial.begin(115200);
-  delay(10);
-  Serial.println('\n');
+  delay(100);
+
+  // Init RTC
+  Rtc.Begin();
 
   //
   display.init();
   display.setIntensity(2);
   display.clear();
-  const int textWidth = display.getTextWidth((const char *)"Hello!");
-  display.drawText((display.width - textWidth) / 2, 0, (char *)"Hello!");
+  printTextCentered("Hello");
   display.commit();
 
   //
-  configManager.setAPName(deviceName);
-  configManager.begin(config);
+  WiFi.mode(WIFI_STA);
+  WiFi.setHostname(deviceName);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(1000);
+  }
+
+  //
+  MDNS.begin(hostName);
 
   //
   timeClient.begin();
 
-  // Init RTC
-  Rtc.Begin();
-  Rtc.SetSquareWavePin(DS3231SquareWavePin_ModeClock);
-  Rtc.SetSquareWavePinClockFrequency(DS3231SquareWaveClock_1kHz);
-
-  // //
-  // pinMode(pinInterrupt, INPUT_PULLUP);
-  // attachInterrupt(digitalPinToInterrupt(pinInterrupt), onSquareWave, FALLING);
-
-  //
-  MDNS.begin("matrix-clock-3");
-
   // Over-the-Air update
-  ArduinoOTA.onStart([]() {
-    display.clear();
-    display.drawChar(1, 0, '*');
-    display.commit();
-  });
-
-  ArduinoOTA.onEnd([]() {
-    display.clear();
-    display.drawText(1, 0, "*...");
-    display.commit();
-  });
-
+  ArduinoOTA.onStart([]()
+                     { onOTAStart(); });
+  ArduinoOTA.onEnd([]()
+                   { onOTAEnd(); });
   ArduinoOTA.begin();
 }
 
 /**
  * @brief
  *
- * @param x
- * @param y
+ * @param str
  * @param local
  * @param dots
  */
-void drawTime(const int x, const int y, const time_t local, bool dots)
+void sprintTimeShort(char *str, const time_t local, bool dots)
 {
   int h = hour(local);
   int m = minute(local);
-  int s = second(local);
-  int i = x;
+  // int s = second(local);
+  unsigned int i = 0;
 
   // draw time
   if (h >= 10)
   {
-    display.drawChar(i, y, digit(h / 10));
+    str[i++] = digit(h / 10);
   }
-  i += 6;
+  str[i++] = digit(h % 10);
 
-  display.drawChar(i, y, digit(h % 10));
-  i += 6;
-
-  // draw dots
-  if (dots)
-  {
-    display.drawChar(i, y, ':');
-  }
-  i += 3;
+  str[i++] = dots ? ':' : ':';
 
   //
-  display.drawChar(i, y, digit(m / 10));
-  i += 6;
-  display.drawChar(i, y, digit(m % 10));
-  i += 6;
+  str[i++] = digit(m / 10);
+  str[i++] = digit(m % 10);
+
+  str[i++] = 0;
+}
+
+void sprintTimeLong(char *str, const time_t local, bool dots)
+{
+  int h = hour(local);
+  int m = minute(local);
+  int s = second(local);
+
+  unsigned int i = 0;
+
+  // draw time
+  if (h >= 10)
+  {
+    str[i++] = digit(h / 10);
+  }
+  str[i++] = digit(h % 10);
+
+  str[i++] = ':';
+
+  //
+  str[i++] = digit(m / 10);
+  str[i++] = digit(m % 10);
+
+  str[i++] = ':';
+
+  //
+  str[i++] = digit(s / 10);
+  str[i++] = digit(s % 10);
+
+  str[i++] = 0;
 }
 
 /**
- * @brief
+ * Update RTC time with NTP
+ */
+void ntpUpdateLoop()
+{
+  static unsigned long lastUpdate = 0;
+  unsigned long now = timeClient.getEpochTime();
+
+  // update if RTC time is not valid or required interval has passed
+  if ((lastUpdate != 0 && now < lastUpdate + ntpUpdateInterval) && Rtc.IsDateTimeValid())
+  {
+    // no need to update
+    return;
+  }
+
+  if (!timeClient.forceUpdate())
+    return;
+
+  // get updated time
+  now = timeClient.getEpochTime();
+
+  // Serial.print("Got NTP time: ");
+  // Serial.println(timeClient.getFormattedTime());
+
+  // update RTC time
+  RtcDateTime timeNow = RtcDateTime(year(now), month(now), day(now), hour(now), minute(now), second(now));
+  Rtc.SetDateTime(timeNow);
+}
+
+/**
+ * Update display
+ */
+void displayLoop()
+{
+  // Clear display
+  display.clear();
+
+  //
+  if (!Rtc.IsDateTimeValid())
+  {
+    // blinking dashes
+    printTextCentered(dots ? "--:--" : ":");
+  }
+  else
+  {
+    // get RTC time
+    RtcDateTime utc = Rtc.GetDateTime();
+
+    // convert UTC time to local
+    time_t local = tzBerlin.toLocal(utc.Unix32Time());
+
+    static char strTime[12] = {0};
+    sprintTimeShort(strTime, local, dots);
+    printTextCentered(strTime);
+  }
+
+  //
+  display.commit();
+}
+
+/**
+ * Calculate average ambient brightness over multiple measures
+ */
+void intencityMeasureLoop()
+{
+  static int measures[10] = {0};
+  static int currentMeasure = 0;
+
+  measures[currentMeasure++] = (analogRead(A0) * 15) / 1024;
+
+  currentMeasure = currentMeasure % 10;
+  int sum = 0;
+  for (int i = 0; i < 10; i++)
+  {
+    sum += measures[i];
+  }
+
+  targetIntensity = sum / 10;
+}
+
+/**
+ * Update display intencity
+ */
+void intencityUpdateLoop()
+{
+  // change display intensity
+  if (intensity < targetIntensity)
+  {
+    intensity += 1;
+    display.setIntensity(intensity);
+  }
+  else if (intensity > targetIntensity)
+  {
+    intensity -= 1;
+    display.setIntensity(intensity);
+  }
+}
+
+/**
  *
  */
 void loop()
 {
   //
-  configManager.loop();
-
-  //
-  timeClient.update();
-
-  //
   ArduinoOTA.handle();
 
   //
-  RecurringTask::interval(500, []() {
-    dots = !dots;
-  });
+  RecurringTask::interval(500, []()
+                          { dots = !dots; });
 
   // display update
-  RecurringTask::interval(50, []() {
-    // Clear display
-    display.clear();
-
-    //
-    if (!Rtc.IsDateTimeValid())
-    {
-      Serial.println("RTC lost confidence in the DateTime!");
-
-      if (dots)
-      {
-        display.drawText(7, 0, "--:--");
-      }
-      else
-      {
-        display.drawText(7, 0, "  :  ");
-      }
-
-      if (WiFi.status() != WL_CONNECTED)
-      {
-        // not connected
-        Serial.println("Connecting to WiFi...");
-      }
-      else
-      {
-        if (timeClient.forceUpdate())
-        {
-          time_t now = timeClient.getEpochTime();
-
-          Serial.print("Got NTP time: ");
-          Serial.println(timeClient.getFormattedTime());
-
-          // update RTC time
-          RtcDateTime timeNow = RtcDateTime(year(now), month(now), day(now), hour(now), minute(now), second(now));
-          Rtc.SetDateTime(timeNow);
-        }
-      }
-    }
-    else
-    {
-      // get RTC time
-      RtcDateTime utc = Rtc.GetDateTime();
-
-      // convert UTC time to local
-      time_t local = tzBerlin.toLocal(utc.Epoch32Time());
-
-      drawTime(7, 0, local, dots);
-    }
-
-    //
-    display.commit();
-  });
+  RecurringTask::interval(50, []()
+                          { displayLoop(); });
 
   // change brightness
-  RecurringTask::interval(500, []() {
-    targetIntensity = (analogRead(A0) * 15) / 1024;
+  RecurringTask::interval(50, []()
+                          { intencityMeasureLoop(); });
 
-    // change display intensity
-    if (intensity < targetIntensity)
-    {
-      intensity += 1;
-      display.setIntensity(intensity);
-    }
-    else if (intensity > targetIntensity)
-    {
-      intensity -= 1;
-      display.setIntensity(intensity);
-    }
-  });
+  RecurringTask::interval(100, []()
+                          { intencityUpdateLoop(); });
+
+  RecurringTask::interval(1000, []()
+                          { ntpUpdateLoop(); });
 
   delay(1);
 }

@@ -1,0 +1,4 @@
+const char *ssid = "";
+const char *password = "";
+const char *deviceName = "Matrix Clock v3";
+const char *hostName = "matrix-clock-3";

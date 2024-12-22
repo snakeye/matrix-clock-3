@@ -7,184 +7,183 @@
 namespace LedMatrixDisplay
 {
 
-/**
- * @brief Test alignment
- *
- */
-enum TextAlign
-{
-  left,
-  leftEnd,
-  right,
-  rightEnd,
-  center
-};
-
-/**
- * @brief Canvas objct providing basic graphics operations
- *
- * @tparam TMatrixArray defines geometry of the matrix array
- */
-template <class TMatrixArray>
-class Canvas : public TMatrixArray
-{
-protected:
-  static const unsigned int frameBufferSize = TMatrixArray::width * TMatrixArray::arrayRows;
-
-protected:
-  unsigned char frameBuffer[frameBufferSize] = {0};
-
-public:
   /**
-   * @brief Clear the canvas
+   * @brief Test alignment
    *
-   * Set all pixels to zero
    */
-  void clear()
+  enum TextAlign
   {
-    for (int i = 0; i < frameBufferSize; i++)
+    left,
+    leftEnd,
+    right,
+    rightEnd,
+    center
+  };
+
+  /**
+   * @brief Canvas objct providing basic graphics operations
+   *
+   * @tparam TMatrixArray defines geometry of the matrix array
+   */
+  template <class TMatrixArray>
+  class Canvas : public TMatrixArray
+  {
+  protected:
+    static const unsigned int frameBufferSize = TMatrixArray::width * TMatrixArray::arrayRows;
+
+  protected:
+    unsigned char frameBuffer[frameBufferSize] = {0};
+
+  public:
+    /**
+     * @brief Clear the canvas
+     *
+     * Set all pixels to zero
+     */
+    void clear()
     {
-      frameBuffer[i] = 0;
-    }
-  }
-
-  /**
-   * @brief Set single pixel
-   *
-   * @param x
-   * @param y
-   */
-  void setPixel(const int x, const int y)
-  {
-    unsigned int row = y / TMatrixArray::matrixHeight;
-    unsigned int bit = y % TMatrixArray::matrixHeight;
-
-    frameBuffer[TMatrixArray::width * row + x] |= (1 << bit);
-  }
-
-  /**
-   * @brief Clear single pixel
-   *
-   * @param x
-   * @param y
-   */
-  void clearPixel(const int x, const int y)
-  {
-    unsigned int row = y / TMatrixArray::matrixHeight;
-    unsigned int bit = y % TMatrixArray::matrixHeight;
-
-    frameBuffer[TMatrixArray::width * row + x] &= ~(1 << bit);
-  }
-
-  /**
-   * @brief Get current pixel value in the framebuffer
-   *
-   * @param x
-   * @param y
-   * @return true
-   * @return false
-   */
-  bool getPixel(const int x, const int y)
-  {
-    unsigned int row = y / TMatrixArray::matrixHeight;
-    unsigned int bit = y % TMatrixArray::matrixHeight;
-
-    return (frameBuffer[TMatrixArray::width * row + x] & (1 << bit)) != 0;
-  }
-
-  /**
-   * @brief Get the Text Width object
-   *
-   * @param str
-   * @return unsigned int
-   */
-  unsigned int getTextWidth(const char *str) const
-  {
-    unsigned int width = 0;
-
-    for (char *p = (char *)str; *p != '\0'; p++)
-    {
-      const unsigned int charWidth = charset_width[*p];
-      if (charWidth > 0)
+      for (unsigned int i = 0; i < frameBufferSize; i++)
       {
-        width += charWidth + 1;
+        frameBuffer[i] = 0;
       }
     }
 
-    return width;
-  }
-
-  /**
-   * @brief Draw single character
-   *
-   * @param x
-   * @param y
-   * @param ch
-   * @return unsigned int
-   */
-  unsigned int drawChar(const int x, const int y, const unsigned char ch)
-  {
-    // we draw only first half of ASCII charset
-    if (ch > 127)
-      return 0;
-
-    unsigned char mask = (y >= 0) ? (0xFF << y) : (0xFF > y);
-
-    // character width
-    unsigned int char_width = charset_width[ch];
-    if (char_width == 0)
-      return 0;
-
-    // character offset
-    unsigned int char_offset = charset_offset[ch];
-
-    // draw character
-    for (int j = 0; j < char_width; j++)
+    /**
+     * @brief Set single pixel
+     *
+     * @param x
+     * @param y
+     */
+    void setPixel(const int x, const int y)
     {
-      int col = x + j;
-      if (col >= 0 && col < TMatrixArray::width)
-      {
-        // read column pixels from program memory
-        unsigned char pixels = charset_char[char_offset + j];
+      unsigned int row = y / TMatrixArray::matrixHeight;
+      unsigned int bit = y % TMatrixArray::matrixHeight;
 
-        // shift pixels
-        pixels = (y >= 0) ? (pixels << y) : (pixels >> (-y));
-
-        // update canvas
-        frameBuffer[col] &= ~(mask);
-        frameBuffer[col] |= pixels;
-      }
+      frameBuffer[TMatrixArray::width * row + x] |= (1 << bit);
     }
 
-    return char_width;
-  }
-
-  /**
-   * @brief
-   *
-   * @param x
-   * @param y
-   * @param str
-   */
-  void drawText(const int x, const int y, const char *str)
-  {
-    // if is not visible, return
-    if (y < -8 || y > 8)
-      return;
-
-    int i = x;
-
-    for (char *p = (char *)str; *p != '\0' && i < TMatrixArray::width; p++)
+    /**
+     * @brief Clear single pixel
+     *
+     * @param x
+     * @param y
+     */
+    void clearPixel(const int x, const int y)
     {
-      unsigned int char_width = drawChar(i, y, *p);
+      unsigned int row = y / TMatrixArray::matrixHeight;
+      unsigned int bit = y % TMatrixArray::matrixHeight;
 
-      if (char_width > 0)
+      frameBuffer[TMatrixArray::width * row + x] &= ~(1 << bit);
+    }
+
+    /**
+     * @brief Get current pixel value in the framebuffer
+     *
+     * @param x
+     * @param y
+     * @return true
+     * @return false
+     */
+    bool getPixel(const int x, const int y)
+    {
+      unsigned int row = y / TMatrixArray::matrixHeight;
+      unsigned int bit = y % TMatrixArray::matrixHeight;
+
+      return (frameBuffer[TMatrixArray::width * row + x] & (1 << bit)) != 0;
+    }
+
+    /**
+     * @brief Get the Text Width object
+     *
+     * @param str
+     * @return unsigned int
+     */
+    unsigned int getTextWidth(const char *str) const
+    {
+      unsigned int width = 0;
+
+      for (unsigned int i = 0; str[i] != '\0'; i++)
       {
-        // position of the next char
-        i += char_width + 1;
+        const unsigned int charWidth = charset_width[(uint8_t)str[i]];
+        if (charWidth > 0)
+        {
+          width += charWidth + 1;
+        }
+      }
+
+      return width;
+    }
+
+    /**
+     * @brief Draw single character
+     *
+     * @param x
+     * @param y
+     * @param ch
+     * @return unsigned int
+     */
+    unsigned int drawChar(const int x, const int y, const unsigned char ch)
+    {
+      // we draw only first half of ASCII charset
+      if (ch > 127)
+        return 0;
+
+      unsigned char mask = (y >= 0) ? (0xFF << y) : (0xFF > y);
+
+      // character width
+      unsigned int char_width = charset_width[ch];
+      if (char_width == 0)
+        return 0;
+
+      // character offset
+      unsigned int char_offset = charset_offset[ch];
+
+      // draw character
+      for (unsigned int j = 0; j < char_width; j++)
+      {
+        unsigned int col = x + j;
+        if (col < TMatrixArray::width)
+        {
+          // read column pixels from program memory
+          unsigned char pixels = charset_char[char_offset + j];
+
+          // shift pixels
+          pixels = (y >= 0) ? (pixels << y) : (pixels >> (-y));
+
+          // update canvas
+          frameBuffer[col] &= ~(mask);
+          frameBuffer[col] |= pixels;
+        }
+      }
+
+      return char_width;
+    }
+
+    /**
+     * @brief
+     *
+     * @param x
+     * @param y
+     * @param str
+     */
+    void drawText(const int x, const int y, const char *str)
+    {
+      // if is not visible, return
+      if (y < -8 || y > 8)
+        return;
+
+      int x0 = x;
+
+      for (unsigned int i = 0; str[i] != '\0' && x0 < (int)TMatrixArray::width; i++)
+      {
+        unsigned int char_width = drawChar(x0, y, str[i]);
+        if (char_width > 0)
+        {
+          // position of the next char
+          x0 += char_width + 1;
+        }
       }
     }
-  }
-};
+  };
 
 } // namespace LedMatrixDisplay

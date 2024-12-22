@@ -3,6 +3,8 @@
 ## Overview
 Imagine combining the charm of retro LED displays with modern smart technology. **LED Matrix Clock v3** is a creative DIY project that transforms five 8x8 LED matrices into a sleek timepiece. Powered by an ESP8266 microcontroller, this clock not only displays the current time but also keeps it accurate by syncing with an NTP server. The DS3231 RTC module ensures reliability, while automatic daylight saving adjustments make it smarter than your average clock. Built using the Arduino framework and developed in the PlatformIO environment, this project is a perfect blend of classic aesthetics and cutting-edge convenience.
 
+![LED Matrix Clock v3](docs/photo.jpeg)
+
 ## Features
 - **Time Display**: Shows the current time in the local time zone.
 - **Automatic Daylight Calculation**: Adjusts for daylight saving time automatically.
@@ -10,7 +12,7 @@ Imagine combining the charm of retro LED displays with modern smart technology. 
 
 ## Hardware Requirements
 - **ESP8266 (ESP-12 Module)**
-- **5 x 8x8 LED Matrices**
+- **5 x 8x8 LED Matrices using MAX7219 drivers**
 - **DS3231 RTC Module**
 
 ## Software Requirements

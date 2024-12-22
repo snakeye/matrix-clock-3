@@ -53,12 +53,12 @@ const unsigned long ntpUpdateInterval = 86400;
 
 // RTC clock DS3231
 // RTC keeps time in UTC!
-RtcDS3231<TwoWire> Rtc(Wire);
+RtcDS3231<TwoWire> rtcClock(Wire);
 
-// Time zone
+// Time zone Europe/Berlin
 TimeChangeRule CEST = {"CEST", Last, Sun, Mar, 2, 60 * 2};
 TimeChangeRule CET = {"CET", Last, Sun, Oct, 2, 60 * 1};
-Timezone tzBerlin(CEST, CET);
+Timezone timezone(CEST, CET);
 
 //
 bool dots = false;
@@ -115,7 +115,7 @@ void setup()
   delay(100);
 
   // Init RTC
-  Rtc.Begin();
+  rtcClock.Begin();
 
   //
   display.init();
@@ -216,7 +216,7 @@ void ntpUpdateLoop()
   unsigned long now = timeClient.getEpochTime();
 
   // update if RTC time is not valid or required interval has passed
-  if ((lastUpdate != 0 && now < lastUpdate + ntpUpdateInterval) && Rtc.IsDateTimeValid())
+  if ((lastUpdate != 0 && now < lastUpdate + ntpUpdateInterval) && rtcClock.IsDateTimeValid() && timeClient.isTimeSet())
   {
     // no need to update
     return;
@@ -233,7 +233,7 @@ void ntpUpdateLoop()
 
   // update RTC time
   RtcDateTime timeNow = RtcDateTime(year(now), month(now), day(now), hour(now), minute(now), second(now));
-  Rtc.SetDateTime(timeNow);
+  rtcClock.SetDateTime(timeNow);
 }
 
 /**
@@ -245,7 +245,7 @@ void displayLoop()
   display.clear();
 
   //
-  if (!Rtc.IsDateTimeValid())
+  if (!rtcClock.IsDateTimeValid() || !timeClient.isTimeSet())
   {
     // blinking dashes
     printTextCentered(dots ? "--:--" : ":");
@@ -253,10 +253,10 @@ void displayLoop()
   else
   {
     // get RTC time
-    RtcDateTime utc = Rtc.GetDateTime();
+    RtcDateTime utc = rtcClock.GetDateTime();
 
     // convert UTC time to local
-    time_t local = tzBerlin.toLocal(utc.Unix32Time());
+    time_t local = timezone.toLocal(utc.Unix32Time());
 
     static char strTime[12] = {0};
     sprintTimeShort(strTime, local, dots);

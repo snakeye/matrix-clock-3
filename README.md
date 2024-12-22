@@ -9,6 +9,7 @@ Imagine combining the charm of retro LED displays with modern smart technology. 
 - **Time Display**: Shows the current time in the local time zone.
 - **Automatic Daylight Calculation**: Adjusts for daylight saving time automatically.
 - **NTP Synchronization**: Regular updates to the RTC clock via NTP ensure time accuracy.
+- **Automatic Brightness**: The display brightness is adjusted according to ambient lighting.
 
 ## Hardware Requirements
 - **ESP8266 (ESP-12 Module)**

@@ -111,7 +111,7 @@ namespace LedMatrixDisplay
         }
       }
 
-      return width;
+      return width > 0 ? width - 1 : 0;
     }
 
     /**

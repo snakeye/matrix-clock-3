@@ -28,6 +28,8 @@
 
 #include "config.h"
 
+#define INTENSITY_MEASUREMENTS 40
+
 //
 using namespace LedMatrixDisplay;
 
@@ -61,15 +63,10 @@ TimeChangeRule CET = {"CET", Last, Sun, Oct, 2, 60 * 1};
 Timezone timezone(CEST, CET);
 
 //
-bool dots = false;
-
-//
 static int intensity = 2;
 static int targetIntensity = 2;
 
 /**
- * @brief
- *
  * @param val
  * @return char
  */
@@ -95,7 +92,7 @@ void onOTAStart()
 {
   display.setIntensity(2);
   display.clear();
-  printTextCentered("*...");
+  printTextCentered("*>...");
   display.commit();
 }
 
@@ -238,7 +235,7 @@ void ntpUpdateLoop()
 /**
  * Update display
  */
-void displayLoop()
+void displayLoop(bool dots)
 {
   // Clear display
   display.clear();
@@ -271,19 +268,20 @@ void displayLoop()
  */
 void intencityMeasureLoop()
 {
-  static int measures[10] = {0};
+  static int measures[INTENSITY_MEASUREMENTS] = {0};
   static int currentMeasure = 0;
 
   measures[currentMeasure++] = (analogRead(A0) * 15) / 1024;
 
-  currentMeasure = currentMeasure % 10;
+  currentMeasure = currentMeasure % INTENSITY_MEASUREMENTS;
+
+  // calculate average
   int sum = 0;
-  for (int i = 0; i < 10; i++)
+  for (auto i = 0; i < INTENSITY_MEASUREMENTS; i++)
   {
     sum += measures[i];
   }
-
-  targetIntensity = sum / 10;
+  targetIntensity = sum / INTENSITY_MEASUREMENTS;
 }
 
 /**
@@ -310,6 +308,9 @@ void intencityUpdateLoop()
 void loop()
 {
   //
+  static bool dots = false;
+
+  //
   ArduinoOTA.handle();
 
   //
@@ -318,7 +319,7 @@ void loop()
 
   // display update
   RecurringTask::interval(50, []()
-                          { displayLoop(); });
+                          { displayLoop(dots); });
 
   // change brightness
   RecurringTask::interval(50, []()

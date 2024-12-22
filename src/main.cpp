@@ -49,7 +49,7 @@ TDisplay display;
 WiFiUDP ntpUDP;
 const char *ntpServer = "pool.ntp.org";
 NTPClient timeClient(ntpUDP, ntpServer);
-const unsigned long ntpUpdateInterval = 86400;
+const unsigned long ntpUpdateIntervalMillis = (3600 * 3) * 1000; // update every 3 hours
 
 // RTC clock DS3231
 // RTC keeps time in UTC!
@@ -140,7 +140,7 @@ void setup()
 
   //
   timeClient.begin();
-  timeClient.setUpdateInterval(ntpUpdateInterval);
+  timeClient.setUpdateInterval(ntpUpdateIntervalMillis);
 
   // Over-the-Air update
   ArduinoOTA.onStart([]()
@@ -215,17 +215,14 @@ void sprintTimeLong(char *str, const time_t local, bool dots)
  */
 void ntpUpdateLoop()
 {
-  timeClient.update();
+  bool hasNtpUpdate = timeClient.update();
 
   // update if RTC time is not valid or required interval has passed
-  if (rtcClock.IsDateTimeValid())
+  if (rtcClock.IsDateTimeValid() || !hasNtpUpdate)
   {
     // no need to update
     return;
   }
-
-  // if (!timeClient.forceUpdate())
-  //   return;
 
   // get updated time
   time_t now = timeClient.getEpochTime();

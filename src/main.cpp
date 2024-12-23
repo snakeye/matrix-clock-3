@@ -85,6 +85,29 @@ void printTextCentered(const char *str)
   display.drawText(textOffset, 0, str);
 }
 
+void printTimeAnimated(const char *strOld, const char *strNew, int frame)
+{
+  const int textWidth = display.getTextWidth(strNew);
+  const int textOffset = ((int)display.width - textWidth) / 2;
+
+  int x0 = textOffset;
+
+  for (unsigned int i = 0; strNew[i] != '\0' && x0 < (int)display.width; i++)
+  {
+    unsigned int charWidth;
+    if (strOld[i] != strNew[i])
+    {
+      charWidth = display.drawChar(x0, frame - 8, strOld[i]);
+      display.drawChar(x0, frame, strNew[i]);
+    }
+    else
+    {
+      charWidth = display.drawChar(x0, 0, strNew[i]);
+    }
+    x0 += charWidth > 0 ? charWidth + 1 : 0;
+  }
+}
+
 /**
  *
  */
@@ -245,17 +268,33 @@ void displayLoop(bool dots)
   {
     // blinking dashes
     printTextCentered(dots ? "--:--" : ":");
+    display.commit();
+    return;
+  }
+
+  // get RTC time
+  RtcDateTime utc = rtcClock.GetDateTime();
+
+  // convert UTC time to local
+  time_t local = timezone.toLocal(utc.Unix32Time());
+
+  static char strTimePrev[12] = {0};
+  static char strTime[12] = {0};
+  static int frame = 8;
+
+  sprintTimeShort(strTime, local, dots);
+
+  if (strcmp(strTimePrev, strTime) != 0)
+  {
+    printTimeAnimated(strTimePrev, strTime, frame--);
+    if (frame == 0)
+    {
+      memcpy(strTimePrev, strTime, strlen(strTime));
+      frame = 8;
+    }
   }
   else
   {
-    // get RTC time
-    RtcDateTime utc = rtcClock.GetDateTime();
-
-    // convert UTC time to local
-    time_t local = timezone.toLocal(utc.Unix32Time());
-
-    static char strTime[12] = {0};
-    sprintTimeShort(strTime, local, dots);
     printTextCentered(strTime);
   }
 

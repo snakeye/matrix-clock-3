@@ -24,11 +24,16 @@
 //
 #include <RecurringTask.h>
 
+//
+#include <OneButton.h>
+
 #include "LedMatrixDisplay.h"
 
 #include "config.h"
 
 #define INTENSITY_MEASUREMENTS 40
+
+#define PIN_BUTTON 2
 
 //
 using namespace LedMatrixDisplay;
@@ -66,6 +71,28 @@ Timezone timezone(CEST, CET);
 static int intensity = 2;
 static int targetIntensity = 2;
 
+//
+typedef enum
+{
+  MODE_TIME_SHORT,
+  MODE_TIME_LONG,
+  MODE_DATE,
+  MODE_YEAR,
+  MODE_TEMP,
+  MODE_IP,
+} DisplayMode;
+
+DisplayMode displayMode = MODE_TIME_SHORT;
+
+unsigned long modeChanged = 0;
+
+//
+OneButton btn = OneButton(
+    PIN_BUTTON, // Input pin for the button
+    true,       // Button is active LOW
+    false       // Enable internal pull-up resistor
+);
+
 /**
  * @param val
  * @return char
@@ -85,6 +112,9 @@ void printTextCentered(const char *str)
   display.drawText(textOffset, 0, str);
 }
 
+/**
+ *
+ */
 void printTimeAnimated(const char *strOld, const char *strNew, int frame)
 {
   const int textWidth = display.getTextWidth(strNew);
@@ -129,11 +159,47 @@ void onOTAEnd()
   display.commit();
 }
 
+/**
+ *
+ */
+void onClickButton()
+{
+  switch (displayMode)
+  {
+  case MODE_TIME_SHORT:
+    displayMode = MODE_TIME_LONG;
+    break;
+  case MODE_TIME_LONG:
+    displayMode = MODE_DATE;
+    break;
+  case MODE_DATE:
+    displayMode = MODE_YEAR;
+    break;
+  case MODE_YEAR:
+    displayMode = MODE_TEMP;
+    break;
+  case MODE_TEMP:
+    displayMode = MODE_IP;
+    break;
+  case MODE_IP:
+    displayMode = MODE_TIME_SHORT;
+    break;
+  }
+
+  modeChanged = millis();
+}
+
+/**
+ *
+ */
 void setup()
 {
   Serial.begin(115200);
   delay(100);
   Serial.println("\n\nLED Matrix Clock v3");
+
+  //
+  btn.attachClick(onClickButton);
 
   // Init RTC
   rtcClock.Begin();
@@ -200,6 +266,9 @@ void sprintTimeShort(char *str, const time_t local, bool dots)
   str[i++] = 0;
 }
 
+/**
+ *
+ */
 void sprintTimeLong(char *str, const time_t local, bool dots)
 {
   int h = hour(local);
@@ -231,6 +300,13 @@ void sprintTimeLong(char *str, const time_t local, bool dots)
 }
 
 /**
+ *
+ */
+void sprintDate(char *str, const time_t local)
+{
+}
+
+/**
  * Update RTC time with NTP
  */
 void ntpUpdateLoop()
@@ -256,19 +332,15 @@ void ntpUpdateLoop()
 }
 
 /**
- * Update display
+ *
  */
-void displayLoop(bool dots)
+void displayTime(bool dots, DisplayMode mode)
 {
-  // Clear display
-  display.clear();
-
   //
   if (!rtcClock.IsDateTimeValid() || !timeClient.isTimeSet())
   {
     // blinking dashes
     printTextCentered(dots ? "--:--" : ":");
-    display.commit();
     return;
   }
 
@@ -282,7 +354,14 @@ void displayLoop(bool dots)
   static char strTime[12] = {0};
   static int frame = 8;
 
-  sprintTimeShort(strTime, local, dots);
+  if (mode == MODE_TIME_SHORT)
+  {
+    sprintTimeShort(strTime, local, dots);
+  }
+  else if (mode == MODE_TIME_LONG)
+  {
+    sprintTimeLong(strTime, local, dots);
+  }
 
   if (strcmp(strTimePrev, strTime) != 0)
   {
@@ -296,6 +375,119 @@ void displayLoop(bool dots)
   else
   {
     printTextCentered(strTime);
+  }
+}
+
+/**
+ *
+ */
+void displayDate()
+{
+  //
+  if (!rtcClock.IsDateTimeValid() || !timeClient.isTimeSet())
+  {
+    // blinking dashes
+    printTextCentered("--/--");
+    return;
+  }
+
+  // get RTC time
+  RtcDateTime utc = rtcClock.GetDateTime();
+
+  // convert UTC time to local
+  time_t local = timezone.toLocal(utc.Unix32Time());
+
+  static char strDate[12] = {0};
+
+  int d = day(local);
+  int m = month(local);
+
+  sprintf(strDate, "%d/%d", d, m);
+
+  printTextCentered(strDate);
+}
+
+/**
+ *
+ */
+void displayYear()
+{
+  //
+  if (!rtcClock.IsDateTimeValid() || !timeClient.isTimeSet())
+  {
+    // blinking dashes
+    printTextCentered("----");
+    return;
+  }
+
+  // get RTC time
+  RtcDateTime utc = rtcClock.GetDateTime();
+
+  // convert UTC time to local
+  time_t local = timezone.toLocal(utc.Unix32Time());
+
+  static char strDate[12] = {0};
+
+  int y = year(local);
+
+  sprintf(strDate, "%d", y);
+
+  printTextCentered(strDate);
+}
+
+/**
+ *
+ */
+void displayTemp()
+{
+  RtcTemperature rtcTemp = rtcClock.GetTemperature();
+
+  static char strTemp[12] = {0};
+  const float temp = (float)rtcTemp.AsCentiDegC() / 100.0f;
+  sprintf(strTemp, "t: %.1f", temp);
+
+  printTextCentered(strTemp);
+}
+
+/**
+ *
+ */
+void displayIP()
+{
+  static char strIp[12] = {0};
+
+  uint32_t ip = WiFi.localIP().v4();
+
+  sprintf(strIp, "IP: .%d", (ip >> 24));
+  printTextCentered(strIp);
+}
+
+/**
+ * Update display
+ */
+void displayLoop(bool dots)
+{
+  // Clear display
+  display.clear();
+
+  switch (displayMode)
+  {
+  case MODE_TIME_SHORT:
+  case MODE_TIME_LONG:
+    displayTime(dots, displayMode);
+    break;
+  case MODE_DATE:
+    displayDate();
+    break;
+  case MODE_YEAR:
+    displayYear();
+    break;
+  case MODE_TEMP:
+    displayTemp();
+    break;
+  case MODE_IP:
+    displayIP();
+    break;
   }
 
   //
@@ -351,6 +543,9 @@ void loop()
 
   //
   ArduinoOTA.handle();
+
+  //
+  btn.tick();
 
   //
   RecurringTask::interval(500, []()

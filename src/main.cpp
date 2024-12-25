@@ -35,6 +35,8 @@
 
 #define PIN_BUTTON 2
 
+#define MODE_RESET_DELAY 15000
+
 //
 using namespace LedMatrixDisplay;
 
@@ -300,13 +302,6 @@ void sprintTimeLong(char *str, const time_t local, bool dots)
 }
 
 /**
- *
- */
-void sprintDate(char *str, const time_t local)
-{
-}
-
-/**
  * Update RTC time with NTP
  */
 void ntpUpdateLoop()
@@ -492,6 +487,13 @@ void displayLoop(bool dots)
 
   //
   display.commit();
+
+  unsigned long now = millis();
+
+  if (displayMode != MODE_TIME_SHORT && now > modeChanged + MODE_RESET_DELAY)
+  {
+    displayMode = MODE_TIME_SHORT;
+  }
 }
 
 /**
